@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Seedream 图 + 文生图</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Seedream 图 + 文生图生成器</h2>
+
+    <label>API Key:</label>
+    <input type="text" id="apiKey" placeholder="输入 Seedream API Key">
+    <button id="saveApiKeyBtn">保存 API Key</button>
+
+    <label>上传参考图片：</label>
+    <input type="file" id="imageInput" multiple accept="image/*">
+
+    <label>Prompt（描述想生成的图像）:</label>
+    <input type="text" id="prompt" placeholder="例如：一只戴着墨镜的猫在沙滩上">
+
+    <label>尺寸:</label>
+    <select id="size">
+      <option value="1024x1024">1024x1024</option>
+      <option value="2048x2048">2048x2048</option>
+    </select>
+
+    <button id="generateBtn">生成图片</button>
+
+    <div id="preview"></div>
+    <div id="results"></div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
