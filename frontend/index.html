@@ -2,33 +2,90 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>Seedream 图 + 文生图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nano Banana 🍌 - AI 图像生成器</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <h2>Seedream 图 + 文生图生成器</h2>
+    <!-- 头部 -->
+    <div class="header">
+      <h1>🍌 Nano Banana</h1>
+      <p class="subtitle">Google Gemini 2.5 Flash 驱动的 AI 图像生成器</p>
+      <div class="badge-group">
+        <span class="badge badge-primary">支持多参考图(最多10张)</span>
+        <span class="badge badge-success">Base64 传输</span>
+        <span class="badge badge-info">10秒快速生成</span>
+      </div>
+    </div>
 
-    <label>API Key:</label>
-    <input type="text" id="apiKey" placeholder="输入 Seedream API Key">
-    <button id="saveApiKeyBtn">保存 API Key</button>
+    <!-- API Key 设置 -->
+    <div class="section">
+      <label class="label-with-link">
+        <span>🔑 Google API Key:</span>
+        <a href="https://aistudio.google.com/apikey" target="_blank" class="help-link">获取 API Key →</a>
+      </label>
+      <input type="text" id="apiKey" placeholder="输入你的 Google API Key (AIza...)" class="input-key">
+      <p class="hint">💡 首次使用需要在 Google AI Studio 创建 API Key 并启用计费</p>
+    </div>
 
-    <label>上传参考图片：</label>
-    <input type="file" id="imageInput" multiple accept="image/*">
+    <!-- 参考图片上传 -->
+    <div class="section">
+      <label class="label-with-info">
+        <span>🖼️ 上传参考图片（可选）:</span>
+        <span class="info-tag">最多10张 | JPG/PNG/WebP | 最大20MB</span>
+      </label>
+      <div class="upload-area">
+        <input type="file" id="imageInput" multiple accept="image/jpeg,image/jpg,image/png,image/webp" style="display: none;">
+        <button onclick="document.getElementById('imageInput').click()" class="btn btn-upload">
+          📁 选择图片
+        </button>
+        <p class="upload-hint">或拖拽图片到此处</p>
+      </div>
+      <div id="preview"></div>
+    </div>
 
-    <label>Prompt（描述想生成的图像）:</label>
-    <input type="text" id="prompt" placeholder="例如：一只戴着墨镜的猫在沙滩上">
+    <!-- 文字描述 -->
+    <div class="section">
+      <label class="label-with-info">
+        <span>✍️ 文字描述（Prompt）:</span>
+        <span class="info-tag">推荐使用英文</span>
+      </label>
+      <textarea id="prompt" 
+                rows="3" 
+                placeholder="例如：A cute cat wearing sunglasses on a sunny beach&#10;示例：Add a wizard hat to the person, make background magical" 
+                class="textarea-prompt"></textarea>
+      <p id="chineseWarning" class="chinese-warning" style="display: none;">
+        ⚠️ 检测到中文输入 - Nano Banana 对英文提示词效果更好，建议使用英文描述以获得最佳效果
+      </p>
+      <p class="hint">💡 提示: 可以描述想要添加的元素、修改的风格、或整体场景</p>
+    </div>
 
-    <label>尺寸:</label>
-    <select id="size">
-      <option value="1024x1024">1024x1024</option>
-      <option value="2048x2048">2048x2048</option>
-    </select>
+    <!-- 生成按钮 -->
+    <div class="section">
+      <button id="generateBtn" class="btn btn-generate" disabled>
+        🎨 生成图片
+      </button>
+      <p class="generate-hint">⏱️ 预计生成时间: 10-15 秒</p>
+    </div>
 
-    <button id="generateBtn">生成图片</button>
+    <!-- 生成结果 -->
+    <div class="section">
+      <div id="results"></div>
+    </div>
 
-    <div id="preview"></div>
-    <div id="results"></div>
+    <!-- 底部信息 -->
+    <div class="footer">
+      <p>
+        <strong>Nano Banana</strong> 是 Google Gemini 2.5 Flash 的图像生成功能 
+        <a href="https://ai.google.dev/gemini-api/docs/image-generation" target="_blank">查看文档</a>
+      </p>
+      <p class="footer-links">
+        <a href="https://aistudio.google.com/apikey" target="_blank">获取 API Key</a> | 
+        <a href="https://github.com" target="_blank">GitHub</a> | 
+        <a href="#" onclick="alert('支持多参考图融合\\n支持图像编辑\\n支持风格迁移\\n平均10秒生成'); return false;">功能介绍</a>
+      </p>
+    </div>
   </div>
 
   <script src="main.js"></script>

@@ -25,49 +25,9 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 } // 单张最大 200MB
 });
 
-// API Key 文件
-const API_KEY_FILE = path.join(__dirname, 'apikey.json');
-function getApiKey() {
-  try {
-    if (fs.existsSync(API_KEY_FILE)) {
-      const data = fs.readFileSync(API_KEY_FILE, 'utf-8');
-      // 检查文件是否为空
-      if (!data || data.trim() === '') {
-        return '';
-      }
-      const parsed = JSON.parse(data);
-      return parsed.apiKey || '';
-    }
-  } catch (err) {
-    console.error('读取 API Key 失败:', err.message);
-    // 如果 JSON 解析失败，删除损坏的文件
-    if (fs.existsSync(API_KEY_FILE)) {
-      fs.unlinkSync(API_KEY_FILE);
-    }
-  }
-  return '';
-}
-function saveApiKey(apiKey) {
-  try {
-    fs.writeFileSync(API_KEY_FILE, JSON.stringify({ apiKey }, null, 2));
-    console.log('✅ API Key 已保存');
-  } catch (err) {
-    console.error('❌ 保存 API Key 失败:', err.message);
-    throw err;
-  }
-}
-
 // ==============================
 // 路由
 // ==============================
-
-// 保存 API Key
-app.post('/save-api-key', (req, res) => {
-  const { apiKey } = req.body;
-  if (!apiKey) return res.status(400).json({ error: 'API Key 不能为空' });
-  saveApiKey(apiKey);
-  res.json({ success: true });
-});
 
 // 上传图片并返回 Base64
 app.post('/upload', upload.array('images', 10), (req, res) => {
@@ -86,19 +46,18 @@ app.post('/upload', upload.array('images', 10), (req, res) => {
 
 // Nano Banana 图生图（Google Gemini API）
 app.post('/generate', async (req, res) => {
-  const { prompt, image_urls = [], num_images = 1 } = req.body;
+  const { prompt, image_urls = [], num_images = 1, apiKey } = req.body;
   
   console.log('📥 收到生成请求:', { 
     prompt_length: prompt?.length, 
-    num_images: image_urls.length 
+    num_images: image_urls.length,
+    has_api_key: !!apiKey
   });
   
-  const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    console.error('❌ API Key 未设置');
+  if (!apiKey || apiKey.trim() === '') {
+    console.error('❌ API Key 未提供');
     return res.status(400).json({ 
-      error: '未设置 API Key，请先在页面上保存 Google API Key',
+      error: '请输入 Google API Key',
       hint: '访问 https://aistudio.google.com/apikey 获取 API Key'
     });
   }
@@ -171,15 +130,15 @@ app.post('/generate', async (req, res) => {
     };
 
     console.log('调用 Nano Banana API 参数:', {
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-2.5-flash-image-preview',
       num_reference_images: image_urls.length,
       prompt_length: prompt.length,
       num_images: num_images
     });
 
     // Google Gemini API endpoint (Nano Banana 模型)
-    // 注意：必须使用 gemini-2.5-flash-image 模型名称
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
+    // 注意：使用 preview 版本的模型名称
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -216,18 +175,40 @@ app.post('/generate', async (req, res) => {
       if (data.candidates && data.candidates.length > 0) {
         const candidate = data.candidates[0];
         
+        // 检查是否有 finishReason 错误
+        if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+          const errorMessages = {
+            'NO_IMAGE': '⚠️ AI 无法为此提示词生成图片。可能原因：\n- 提示词与参考图片不匹配\n- 描述的内容无法生成\n- 提示词过于复杂或模糊\n\n建议：\n- 简化提示词，使用更明确的描述\n- 确保提示词与参考图片相关\n- 尝试用英文描述',
+            'SAFETY': '🚫 内容被安全过滤器拦截，请修改提示词',
+            'RECITATION': '⚠️ 生成内容可能涉及版权问题',
+            'MAX_TOKENS': '⚠️ Token 数量超限，请减少参考图片或简化提示词',
+            'OTHER': '⚠️ 生成失败，请重试'
+          };
+          
+          const errorMsg = errorMessages[candidate.finishReason] || errorMessages['OTHER'];
+          console.log(`❌ 生成失败: ${candidate.finishReason}`);
+          
+          return res.status(400).json({ 
+            error: errorMsg,
+            finishReason: candidate.finishReason,
+            hint: '💡 提示：尝试使用更简单、清晰的英文提示词，例如 "Add sunglasses" 或 "Change background to beach"'
+          });
+        }
+        
         // 提取生成的图片（base64 格式）
         if (candidate.content && candidate.content.parts) {
-          const imageParts = candidate.content.parts.filter(part => part.inline_data);
+          const imageParts = candidate.content.parts.filter(part => part.inlineData);
           
           if (imageParts.length > 0) {
             // 转换为统一的返回格式
             const images = imageParts.map((part, index) => {
-              const base64Data = part.inline_data.data;
-              const mimeType = part.inline_data.mime_type || 'image/jpeg';
+              // 注意：这里是 inlineData 不是 inline_data
+              const base64Data = part.inlineData.data;
+              const mimeType = part.inlineData.mimeType || 'image/png';
               
               // 保存到本地文件（可选）
-              const filename = `generated_${Date.now()}_${index}.jpg`;
+              const ext = mimeType.split('/')[1]; // png 或 jpeg
+              const filename = `generated_${Date.now()}_${index}.${ext}`;
               const filepath = path.join(uploadDir, filename);
               fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
               
