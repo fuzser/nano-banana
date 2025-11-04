@@ -5,8 +5,13 @@ const resultsDiv = document.getElementById('results');
 const previewDiv = document.getElementById('preview');
 const promptInput = document.getElementById('prompt');
 const chineseWarning = document.getElementById('chineseWarning');
+const temperatureSlider = document.getElementById('temperature');
+const temperatureValue = document.getElementById('temperatureValue');
+const numImagesSelect = document.getElementById('numImages');
+const aspectRatioSelect = document.getElementById('aspectRatio');
 
 let uploadedBase64 = [];
+let uploadedFiles = [];  // 保存已上传的文件，支持多次添加
 
 // 显示加载状态
 function showLoading(element, message = '处理中...') {
@@ -39,19 +44,20 @@ promptInput.addEventListener('input', () => {
   generateBtn.disabled = text.trim().length === 0;
 });
 
-// 上传图片
+// 随机度滑块实时更新
+temperatureSlider.addEventListener('input', (e) => {
+  temperatureValue.textContent = e.target.value;
+});
+
+// 上传图片 - 支持多次添加
 imageInput.onchange = async () => {
   const files = imageInput.files;
   
-  if (files.length === 0) {
-    previewDiv.innerHTML = '';
-    uploadedBase64 = [];
-    return;
-  }
+  if (files.length === 0) return;
 
-  // 检查文件数量限制（Nano Banana 最多支持 10 张参考图）
-  if (files.length > 10) {
-    alert('⚠️ Nano Banana 最多支持 10 张参考图片\n当前选择了 ' + files.length + ' 张');
+  // 检查总数量限制（已有 + 新增）
+  if (uploadedFiles.length + files.length > 10) {
+    alert(`⚠️ 最多只能添加 10 张图片\n当前已有 ${uploadedFiles.length} 张，只能再添加 ${10 - uploadedFiles.length} 张`);
     imageInput.value = '';
     return;
   }
@@ -94,56 +100,69 @@ imageInput.onchange = async () => {
       throw new Error(data.error);
     }
 
-    uploadedBase64 = data.files.map(f => f.base64);
+    // 添加到已有列表（而不是替换）
+    data.files.forEach(f => {
+      uploadedBase64.push(f.base64);
+      uploadedFiles.push(f);
+    });
     
-    // 显示预览图（优化后的样式）
-    previewDiv.innerHTML = `
-      <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
-        ${data.files.map((f, index) => `
-          <div style="position: relative; display: inline-block;">
-            <img src="${f.url}" width="120" height="120" style="object-fit: cover; border-radius: 8px; border: 2px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <button onclick="removeImage(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s;" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">×</button>
-            <div style="position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${index + 1}</div>
-          </div>
-        `).join('')}
-      </div>
-      <p style="margin: 0; color: #27ae60; font-size: 14px; font-weight: bold;">✅ 已上传 ${data.files.length} 张参考图片</p>
-      <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 12px;">💡 提示: Nano Banana 会根据这些图片和文字描述生成新图像</p>
-    `;
+    // 更新预览显示
+    updatePreview();
+    
+    // 清空文件选择器，以便下次可以选择相同文件
+    imageInput.value = '';
     
     // 启用生成按钮
     generateBtn.disabled = false;
   } catch (error) {
     console.error('上传图片失败:', error);
     previewDiv.innerHTML = `<p style="color: #e74c3c; background: #fadbd8; padding: 12px; border-radius: 8px; border-left: 4px solid #e74c3c;">❌ 上传失败: ${error.message}</p>`;
-    uploadedBase64 = [];
     imageInput.value = '';
   }
 };
+
+// 更新预览显示
+function updatePreview() {
+  if (uploadedFiles.length === 0) {
+    previewDiv.innerHTML = '';
+    return;
+  }
+
+  previewDiv.innerHTML = `
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
+      ${uploadedFiles.map((f, index) => `
+        <div style="position: relative; display: inline-block;">
+          <img src="${f.url}" width="120" height="120" style="object-fit: cover; border-radius: 8px; border: 2px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <button onclick="removeImage(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-weight: bold; font-size: 18px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s;" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">×</button>
+          <div style="position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${index + 1}</div>
+        </div>
+      `).join('')}
+    </div>
+    <p style="margin: 0; color: #27ae60; font-size: 14px; font-weight: bold;">✅ 已添加 ${uploadedFiles.length} 张参考图片</p>
+    <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 12px;">💡 提示: 可以继续点击"添加图片"按钮（最多10张）</p>
+  `;
+}
 
 // 删除单张图片
 window.removeImage = (index) => {
   uploadedBase64.splice(index, 1);
+  uploadedFiles.splice(index, 1);
   
-  if (uploadedBase64.length === 0) {
+  if (uploadedFiles.length === 0) {
     previewDiv.innerHTML = '';
-    imageInput.value = '';
     generateBtn.disabled = false; // 允许纯文生图
   } else {
-    // 重新渲染预览
-    const dataTransfer = new DataTransfer();
-    const currentFiles = Array.from(imageInput.files);
-    currentFiles.splice(index, 1);
-    currentFiles.forEach(file => dataTransfer.items.add(file));
-    imageInput.files = dataTransfer.files;
-    imageInput.dispatchEvent(new Event('change'));
+    updatePreview();
   }
 };
 
-// 生成图片
+// 生成图片 - 并发请求版本
 generateBtn.onclick = async () => {
   const prompt = promptInput.value.trim();
   const apiKey = apiKeyInput.value.trim();
+  const numImages = parseInt(numImagesSelect.value);
+  const temperature = parseFloat(temperatureSlider.value);
+  const aspectRatio = aspectRatioSelect.value;
 
   // 验证输入
   if (!apiKey) {
@@ -166,109 +185,188 @@ generateBtn.onclick = async () => {
   // 禁用按钮防止重复点击
   generateBtn.disabled = true;
   const originalText = generateBtn.textContent;
-  generateBtn.textContent = '生成中...';
+  generateBtn.textContent = `生成 ${numImages} 张图片中...`;
 
-  // 显示生成进度
-  showLoading(resultsDiv, '🎨 Nano Banana 生成中...<br><small style="color: #95a5a6;">平均需要 10-15 秒，请耐心等待</small>');
-
+  // 初始化结果容器
   const startTime = Date.now();
+  let completedCount = 0;
+  let successCount = 0;
+  const allImages = [];
+  
+  resultsDiv.innerHTML = `
+    <div style="margin-bottom: 20px; padding: 16px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 8px;">
+      <h3 style="margin: 0 0 10px 0; color: #1976d2;">🎨 正在并发生成 ${numImages} 张图片...</h3>
+      <div style="position: relative; width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
+        <div id="progressFill" style="position: absolute; left: 0; top: 0; width: 0%; height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s ease-out;"></div>
+      </div>
+      <p id="progressText" style="margin: 0; color: #1976d2; font-size: 14px; font-weight: 500;">已完成: 0/${numImages}</p>
+      <p style="margin: 5px 0 0 0; color: #666; font-size: 12px;">💡 图片生成完成后会立即显示</p>
+    </div>
+    <div id="imageGrid" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
+  `;
+
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const imageGrid = document.getElementById('imageGrid');
+
+  // 更新进度
+  const updateProgress = () => {
+    const progress = (completedCount / numImages) * 100;
+    progressFill.style.width = `${progress}%`;
+    progressText.textContent = `已完成: ${completedCount}/${numImages} (成功: ${successCount}，失败: ${completedCount - successCount})`;
+  };
+
+  // 添加单张图片到显示区域
+  const addImageToGrid = (img, index) => {
+    const imageCard = document.createElement('div');
+    imageCard.style.cssText = 'position: relative; border: 2px solid #3498db; border-radius: 12px; padding: 8px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); animation: fadeIn 0.3s ease-out;';
+    imageCard.innerHTML = `
+      <div style="position: absolute; top: -10px; right: -10px; background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+        #${index + 1}
+      </div>
+      <img src="${img.url}" style="max-width: 400px; max-height: 400px; display: block; border-radius: 8px;">
+      <div style="margin-top: 10px; display: flex; gap: 8px; justify-content: center;">
+        <a href="${img.url}" target="_blank" rel="noopener noreferrer" style="padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">📥 新标签打开</a>
+        <button onclick="copyBase64ForImage('${img.base64}')" style="padding: 8px 16px; background: #9b59b6; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer;">📋 Base64</button>
+      </div>
+    `;
+    imageGrid.appendChild(imageCard);
+  };
+
+  // 并发生成函数
+  const generateSingle = async (index) => {
+    try {
+      const res = await fetch('http://localhost:3000/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt,
+          apiKey,
+          image_urls: uploadedBase64,
+          temperature: temperature,
+          aspectRatio: aspectRatio
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        console.error(`图片 #${index + 1} 生成失败:`, data.error);
+        completedCount++;
+        updateProgress();
+        
+        // 显示错误卡片
+        const errorCard = document.createElement('div');
+        errorCard.style.cssText = 'position: relative; border: 2px solid #e74c3c; border-radius: 12px; padding: 20px; background: #fadbd8; animation: fadeIn 0.3s ease-out; min-width: 200px;';
+        errorCard.innerHTML = `
+          <div style="position: absolute; top: -10px; right: -10px; background: #e74c3c; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
+            #${index + 1}
+          </div>
+          <p style="margin: 0; color: #c0392b; font-weight: bold;">❌ 生成失败</p>
+          <p style="margin: 5px 0 0 0; color: #c0392b; font-size: 12px;">${data.error.substring(0, 50)}...</p>
+        `;
+        imageGrid.appendChild(errorCard);
+        return null;
+      }
+
+      if (data.data && data.data.length > 0) {
+        const img = data.data[0]; // 单次请求只返回一张
+        completedCount++;
+        successCount++;
+        allImages.push(img);
+        updateProgress();
+        addImageToGrid(img, index);
+        return img;
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`图片 #${index + 1} 请求异常:`, error);
+      completedCount++;
+      updateProgress();
+      
+      // 显示错误卡片
+      const errorCard = document.createElement('div');
+      errorCard.style.cssText = 'position: relative; border: 2px solid #e74c3c; border-radius: 12px; padding: 20px; background: #fadbd8; animation: fadeIn 0.3s ease-out; min-width: 200px;';
+      errorCard.innerHTML = `
+        <div style="position: absolute; top: -10px; right: -10px; background: #e74c3c; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
+          #${index + 1}
+        </div>
+        <p style="margin: 0; color: #c0392b; font-weight: bold;">❌ 请求失败</p>
+        <p style="margin: 5px 0 0 0; color: #c0392b; font-size: 12px;">${error.message}</p>
+      `;
+      imageGrid.appendChild(errorCard);
+      return null;
+    }
+  };
 
   try {
-    const res = await fetch('http://localhost:3000/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        prompt,
-        apiKey,  // 直接传递 API Key
-        image_urls: uploadedBase64
-      })
-    });
+    // 并发发送所有请求
+    const promises = [];
+    for (let i = 0; i < numImages; i++) {
+      promises.push(generateSingle(i));
+    }
 
-    const data = await res.json();
+    // 等待所有请求完成
+    await Promise.all(promises);
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-    if (data.error) {
-      // 详细的错误提示
-      let errorMsg = `❌ 生成失败: ${data.error}`;
-      
-      if (data.status === 400) {
-        if (data.finishReason === 'NO_IMAGE') {
-          errorMsg = `🤔 AI 无法为此提示词生成图片\n\n可能原因：\n`;
-          errorMsg += `• 提示词与参考图片不匹配\n`;
-          errorMsg += `• 描述的内容无法实现\n`;
-          errorMsg += `• 提示词过于复杂或模糊\n\n`;
-          errorMsg += `💡 建议：\n`;
-          errorMsg += `• 使用简单明确的英文描述\n`;
-          errorMsg += `• 例如："Add sunglasses", "Change to sunny beach"\n`;
-          errorMsg += `• 确保提示词与上传的图片相关`;
-        } else {
-          errorMsg += '\n\n可能原因:\n';
-          errorMsg += '• API Key 无效或未设置\n';
-          errorMsg += '• 未在 Google AI Studio 启用计费\n';
-          errorMsg += '• 输入格式不正确\n\n';
-          errorMsg += '💡 请访问 https://aistudio.google.com/apikey 检查 API Key';
-        }
-      } else if (data.status === 429) {
-        errorMsg += '\n\n⚠️ 请求过于频繁，请稍后再试';
-      } else if (data.status === 500) {
-        errorMsg += '\n\n⚠️ 服务器错误，请检查后端日志';
-      }
-      
-      if (data.details) {
-        console.error('详细错误:', data.details);
-      }
-
-      resultsDiv.innerHTML = `
-        <div style="background: #fadbd8; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 8px; color: #c0392b;">
-          <h3 style="margin: 0 0 10px 0; color: #e74c3c;">❌ 生成失败</h3>
-          <p style="margin: 0; white-space: pre-line;">${errorMsg}</p>
-        </div>
+    // 更新最终状态
+    const summaryDiv = resultsDiv.querySelector('div');
+    if (successCount > 0) {
+      summaryDiv.innerHTML = `
+        <h3 style="margin: 0 0 10px 0; color: #27ae60;">✅ 生成完成！</h3>
+        <p style="margin: 0; color: #16a085; font-size: 14px;">
+          总耗时 ${duration} 秒 | 成功 ${successCount}/${numImages} 张 | 分辨率 ${aspectRatio} | 随机度 ${temperature}
+        </p>
       `;
-      return;
-    }
-
-    if (data.data && data.data.length > 0) {
-      resultsDiv.innerHTML = `
-        <div style="margin-bottom: 15px; padding: 12px; background: #d5f4e6; border-left: 4px solid #27ae60; border-radius: 8px;">
-          <h3 style="margin: 0 0 5px 0; color: #27ae60;">✅ 生成成功！</h3>
-          <p style="margin: 0; color: #16a085; font-size: 14px;">耗时 ${duration} 秒 | 生成 ${data.data.length} 张图片</p>
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-          ${data.data.map((img, index) => `
-            <div style="position: relative; border: 2px solid #3498db; border-radius: 12px; padding: 8px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <img src="${img.url}" style="max-width: 400px; max-height: 400px; display: block; border-radius: 8px;">
-              <div style="margin-top: 10px; display: flex; gap: 8px; justify-content: center;">
-                <a href="${img.url}" download="nano_banana_${Date.now()}_${index}.jpg" style="padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">📥 下载</a>
-                <button onclick="copyBase64(${index})" style="padding: 8px 16px; background: #9b59b6; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer;">📋 复制Base64</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `;
-      
-      // 保存 base64 数据供复制使用
-      window.generatedImages = data.data;
+      summaryDiv.style.background = '#d5f4e6';
+      summaryDiv.style.borderColor = '#27ae60';
     } else {
-      resultsDiv.innerHTML = `
-        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; border-radius: 8px; color: #856404;">
-          <h3 style="margin: 0 0 10px 0;">⚠️ 未返回图片</h3>
-          <p style="margin: 0;">API 调用成功但未生成图片，请检查输入参数</p>
-        </div>
+      summaryDiv.innerHTML = `
+        <h3 style="margin: 0 0 10px 0; color: #e74c3c;">❌ 全部失败</h3>
+        <p style="margin: 0; color: #c0392b; font-size: 14px;">
+          所有图片生成均失败，请检查 API Key 和网络连接
+        </p>
       `;
+      summaryDiv.style.background = '#fadbd8';
+      summaryDiv.style.borderColor = '#e74c3c';
     }
+
+    // 保存成功的图片数据
+    window.generatedImages = allImages;
+
   } catch (error) {
-    console.error('生成图片异常:', error);
+    console.error('批量生成异常:', error);
     resultsDiv.innerHTML = `
       <div style="background: #fadbd8; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 8px; color: #c0392b;">
-        <h3 style="margin: 0 0 10px 0;">❌ 请求失败</h3>
+        <h3 style="margin: 0 0 10px 0;">❌ 生成失败</h3>
         <p style="margin: 0;">${error.message}</p>
-        <p style="margin: 10px 0 0 0; font-size: 14px;">💡 请确保后端服务正在运行 (http://localhost:3000)</p>
       </div>
     `;
   } finally {
     generateBtn.disabled = false;
     generateBtn.textContent = originalText;
   }
+};
+
+// 复制单个图片的 Base64（新方法）
+window.copyBase64ForImage = (base64) => {
+  navigator.clipboard.writeText(base64).then(() => {
+    alert('✅ Base64 数据已复制到剪贴板！');
+  }).catch(err => {
+    console.error('复制失败:', err);
+    const textarea = document.createElement('textarea');
+    textarea.value = base64;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert('✅ Base64 数据已复制到剪贴板！');
+  });
 };
 
 // 复制 Base64 到剪贴板
